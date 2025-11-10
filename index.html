@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Sliding Puzzle Game</title>
@@ -14,11 +15,13 @@
       height: 100vh;
       color: #fff;
     }
+
     #game-container {
-      box-shadow: 0 0 20px rgba(0,0,0,0.7);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
     }
   </style>
 </head>
+
 <body>
   <div id="game-container"></div>
 
@@ -28,6 +31,99 @@
   <script>
     const TILE_SIZE = 100;
     const GRID_SIZE = 3;
+
+    function makeTextButton(scene, x, y, label, onClick) {
+      const paddingX = 18, paddingY = 10;
+
+      const text = scene.add.text(0, 0, label, {
+        fontFamily: 'Arial',
+        fontSize: '22px',
+        color: '#000000'
+      }).setOrigin(0.5);
+
+      const rect = scene.add.rectangle(0, 0,
+        text.width + paddingX * 2,
+        text.height + paddingY * 2,
+        0xffffff
+      ).setStrokeStyle(2, 0x000000);
+
+      const container = scene.add.container(x, y, [rect, text]);
+      container.setSize(rect.width, rect.height);
+      container.setInteractive({ useHandCursor: true })
+        .on('pointerover', () => rect.setFillStyle(0xdddddd))
+        .on('pointerout', () => rect.setFillStyle(0xffffff))
+        .on('pointerdown', onClick);
+
+      return container;
+    }
+
+    class MenuScene extends Phaser.Scene {
+      constructor() {
+        super('MenuScene');
+      }
+      create() {
+        const { width, height } = this.scale;
+
+        this.add.rectangle(width / 2, height / 2, width, height, 0x222222);
+        this.add.text(width / 2, 120, 'Sliding Puzzle', {
+          fontFamily: 'Arial',
+          fontSize: '36px',
+          color: '#ffffff'
+        }).setOrigin(0.5);
+
+        makeTextButton(this, width / 2, 240, 'Start', () => {
+          this.scene.start('SlidingPuzzleScene'); // <— change  
+        });
+
+        makeTextButton(this, width / 2, 300, 'Instructions', () => {
+          this.scene.start('InstructionsScene');
+        });
+
+        this.add.text(width / 2, height - 24, '© You • Phaser 3', {
+          fontFamily: 'Arial',
+          fontSize: '12px',
+          color: '#bbbbbb'
+        }).setOrigin(0.5);
+      }
+    }
+
+    class InstructionsScene extends Phaser.Scene {
+      constructor() {
+        super('InstructionsScene');
+      }
+      create() {
+        const { width, height } = this.scale;
+
+        this.add.rectangle(width / 2, height / 2, width, height, 0x222222);
+
+        this.add.text(width / 2, 90, 'How to Play', {
+          fontFamily: 'Arial',
+          fontSize: '32px',
+          color: '#ffffff'
+        }).setOrigin(0.5);
+
+        const lines = [
+          'Click a tile next to the empty space to move it.',
+          'Rearrange the tiles into order 1..8 with the blank at the end.',
+          'Tip: Solve row by row to make it easier.'
+        ];
+        this.add.text(width / 2, 180, lines.join('\n'), {
+          fontFamily: 'Arial',
+          fontSize: '18px',
+          color: '#dddddd',
+          align: 'center',
+          wordWrap: { width: 420 }
+        }).setOrigin(0.5);
+
+        makeTextButton(this, width / 2, 360, 'Back to Menu', () => {
+          this.scene.start('MenuScene');
+        });
+
+        makeTextButton(this, width / 2, 420, 'Play Now', () => {
+          this.scene.start('SlidingPuzzleScene'); // <— change
+        });
+      }
+    }
 
     class SlidingPuzzleScene extends Phaser.Scene {
       constructor() {
@@ -43,7 +139,7 @@
 
         this.tileSize = TILE_SIZE;
         this.gridSize = GRID_SIZE;
-        this.offsetX = (width  - this.tileSize * this.gridSize) / 2;
+        this.offsetX = (width - this.tileSize * this.gridSize) / 2;
         this.offsetY = (height - this.tileSize * this.gridSize) / 2;
 
         // Build board dynamically based on grid size
@@ -72,6 +168,7 @@
         // Create tiles based on shuffled board
         this.tileSprites = {};
         this.createTiles();
+        makeTextButton(this, 70, 36, 'Menu', () => this.scene.start('MenuScene'));
 
         // Keyboard selection state
         this.movableIndices = [];
@@ -359,10 +456,11 @@
       height: 520,
       backgroundColor: '#222222',
       parent: 'game-container',
-      scene: SlidingPuzzleScene
+      scene: [MenuScene, InstructionsScene, SlidingPuzzleScene]
     };
 
     new Phaser.Game(config);
   </script>
 </body>
+
 </html>
