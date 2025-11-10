@@ -42,7 +42,7 @@
         this.offsetX = (width  - this.tileSize * this.gridSize) / 2;
         this.offsetY = (height - this.tileSize * this.gridSize) / 2;
 
-        // Build board based on gridSize
+        // Build board dynamically based on grid size
         const totalTiles = this.gridSize * this.gridSize;
         this.board = [];
         for (let i = 1; i <= totalTiles - 1; i++) {
@@ -69,6 +69,13 @@
         this.tileSprites = {};
         this.createTiles();
 
+        // Keyboard selection state
+        this.movableIndices = [];
+        this.selectedMovableIdx = -1;
+
+        // Compute initial movable tiles & highlight
+        this.updateSelectableTiles();
+
         // Victory text
         this.victoryText = this.add.text(
           width / 2,
@@ -85,13 +92,23 @@
         this.add.text(
           width / 2,
           height - 30,
-          'Click a tile next to the empty space to move it',
+          'Mouse: click tiles. Keyboard: J = cycle, K = move',
           {
             fontFamily: 'Arial',
             fontSize: '14px',
             color: '#bbbbbb'
           }
         ).setOrigin(0.5);
+
+        this.input.keyboard.on('keydown-J', () => {
+          if (this.isAnimating || this.input.enabled === false) return;
+          this.cycleSelection();
+        });
+
+        this.input.keyboard.on('keydown-K', () => {
+          if (this.isAnimating || this.input.enabled === false) return;
+          this.moveSelectedTile();
+        });
       }
 
       shuffleBoard(moves) {
@@ -112,7 +129,9 @@
       }
 
       createTiles() {
-        for (let index = 0; index < this.board.length; index++) {
+        const totalTiles = this.board.length;
+
+        for (let index = 0; index < totalTiles; index++) {
           const value = this.board[index];
           if (value === 0) continue; // no sprite for blank
 
@@ -143,6 +162,7 @@
           container.setSize(this.tileSize - 6, this.tileSize - 6);
           container.setInteractive({ useHandCursor: true });
           container.tileNumber = value;
+          container.bgRect = rect; // keep reference for highlight
 
           container.on('pointerdown', () => this.onTileClicked(container));
 
@@ -164,15 +184,15 @@
         const col = index % this.gridSize;
 
         if (row > 0) neighbors.push(index - this.gridSize);
+        if (col < this.gridSize - 1) neighbors.push(index + 1);
         if (row < this.gridSize - 1) neighbors.push(index + this.gridSize);
         if (col > 0) neighbors.push(index - 1);
-        if (col < this.gridSize - 1) neighbors.push(index + 1);
 
         return neighbors;
       }
 
       onTileClicked(tileContainer) {
-        if (this.isAnimating) return;
+        if (this.isAnimating || this.input.enabled === false) return;
 
         const tileNumber = tileContainer.tileNumber;
         const tileIndex = this.board.indexOf(tileNumber);
@@ -184,6 +204,18 @@
           return;
         }
 
+        // If user clicked, also make this the selected movable tile
+        const neighborIdxInList = neighbors.indexOf(tileIndex);
+        if (neighborIdxInList !== -1) {
+          this.movableIndices = neighbors;
+          this.selectedMovableIdx = neighborIdxInList;
+          this.updateSelectionHighlight();
+        }
+
+        this.performMove(tileContainer, tileIndex, blankIndex);
+      }
+
+      performMove(tileContainer, tileIndex, blankIndex) {
         this.isAnimating = true;
         const targetPos = this.indexToWorld(blankIndex);
 
@@ -194,6 +226,7 @@
           duration: 150,
           onComplete: () => {
             // Swap in board state
+            const tileNumber = tileContainer.tileNumber;
             this.board[blankIndex] = tileNumber;
             this.board[tileIndex] = 0;
             this.blankIndex = tileIndex;
@@ -202,6 +235,9 @@
 
             if (this.isSolved()) {
               this.showVictory();
+            } else {
+              // Recompute movable tiles and keep keyboard navigation working
+              this.updateSelectableTiles();
             }
           }
         });
@@ -220,6 +256,94 @@
       showVictory() {
         this.victoryText.setText('Solved! 🎉');
         this.input.enabled = false;
+        this.clearSelectionHighlight();
+      }
+
+      // ---- Keyboard selection helpers ----
+
+      updateSelectableTiles() {
+        const neighbors = this.getNeighborIndices(this.blankIndex)
+          .filter(i => this.board[i] !== 0); // should be redundant but safe
+
+        const oldSelectedTileNumber = this.getSelectedTileNumber();
+
+        this.movableIndices = neighbors;
+
+        if (neighbors.length === 0) {
+          this.selectedMovableIdx = -1;
+          this.clearSelectionHighlight();
+          return;
+        }
+
+        // Try to keep selection on same tile if still movable
+        let newIndex = 0;
+        if (oldSelectedTileNumber !== null) {
+          for (let i = 0; i < neighbors.length; i++) {
+            if (this.board[neighbors[i]] === oldSelectedTileNumber) {
+              newIndex = i;
+              break;
+            }
+          }
+        }
+
+        this.selectedMovableIdx = newIndex;
+        this.updateSelectionHighlight();
+      }
+
+      getSelectedTileNumber() {
+        if (this.selectedMovableIdx < 0 || this.selectedMovableIdx >= this.movableIndices.length) {
+          return null;
+        }
+        const tileIndex = this.movableIndices[this.selectedMovableIdx];
+        return this.board[tileIndex];
+      }
+
+      cycleSelection() {
+        if (!this.movableIndices || this.movableIndices.length === 0) return;
+
+        this.selectedMovableIdx = (this.selectedMovableIdx + 1) % this.movableIndices.length;
+        this.updateSelectionHighlight();
+      }
+
+      moveSelectedTile() {
+        const tileNumber = this.getSelectedTileNumber();
+        if (tileNumber == null) return;
+
+        const tileIndex = this.board.indexOf(tileNumber);
+        const blankIndex = this.blankIndex;
+
+        if (tileIndex === -1) return;
+
+        const neighbors = this.getNeighborIndices(blankIndex);
+        if (!neighbors.includes(tileIndex)) return; // safety check
+
+        const container = this.tileSprites[tileNumber];
+        this.performMove(container, tileIndex, blankIndex);
+      }
+
+      clearSelectionHighlight() {
+        for (const key in this.tileSprites) {
+          const c = this.tileSprites[key];
+          if (c && c.bgRect) {
+            c.bgRect.setFillStyle(0xffffff);
+            c.bgRect.setStrokeStyle(2, 0x000000);
+            c.setScale(1);
+          }
+        }
+      }
+
+      updateSelectionHighlight() {
+        this.clearSelectionHighlight();
+
+        const tileNumber = this.getSelectedTileNumber();
+        if (tileNumber == null) return;
+
+        const container = this.tileSprites[tileNumber];
+        if (container && container.bgRect) {
+          container.bgRect.setFillStyle(0xffee99);
+          container.bgRect.setStrokeStyle(3, 0xffaa00);
+          container.setScale(1.02);
+        }
       }
     }
 
