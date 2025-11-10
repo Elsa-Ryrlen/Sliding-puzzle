@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sliding Puzzle Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+    }
+    #game-container {
+      box-shadow: 0 0 20px rgba(0,0,0,0.7);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <!-- Phaser 3 from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+
+  <script>
+    const TILE_SIZE = 100;
+    const GRID_SIZE = 3;
+
+    class FifteenPuzzleScene extends Phaser.Scene {
+      constructor() {
+        super('FifteenPuzzleScene');
+      }
+
+      create() {
+        const { width, height } = this.scale;
+
+        this.tileSize = TILE_SIZE;
+        this.gridSize = GRID_SIZE;
+        this.offsetX = (width  - this.tileSize * this.gridSize) / 2;
+        this.offsetY = (height - this.tileSize * this.gridSize) / 2;
+
+        // Build board based on gridSize
+        const totalTiles = this.gridSize * this.gridSize;
+        this.board = [];
+        for (let i = 1; i <= totalTiles - 1; i++) {
+          this.board.push(i);
+        }
+        this.board.push(0); // 0 = blank
+        this.blankIndex = totalTiles - 1;
+        this.isAnimating = false;
+
+        // Randomize board by doing valid moves from solved state
+        this.shuffleBoard(200);
+
+        // Draw background frame
+        const frame = this.add.rectangle(
+          width / 2,
+          height / 2,
+          this.tileSize * this.gridSize + 10,
+          this.tileSize * this.gridSize + 10,
+          0x333333
+        );
+        frame.setStrokeStyle(4, 0xffffff);
+
+        // Create tiles based on shuffled board
+        this.tileSprites = {};
+        this.createTiles();
+
+        // Victory text
+        this.victoryText = this.add.text(
+          width / 2,
+          this.offsetY - 40,
+          '',
+          {
+            fontFamily: 'Arial',
+            fontSize: '28px',
+            color: '#ffffff'
+          }
+        ).setOrigin(0.5);
+
+        // Info text
+        this.add.text(
+          width / 2,
+          height - 30,
+          'Click a tile next to the empty space to move it',
+          {
+            fontFamily: 'Arial',
+            fontSize: '14px',
+            color: '#bbbbbb'
+          }
+        ).setOrigin(0.5);
+      }
+
+      shuffleBoard(moves) {
+        for (let i = 0; i < moves; i++) {
+          const neighbors = this.getNeighborIndices(this.blankIndex);
+          const target = Phaser.Utils.Array.GetRandom(neighbors);
+
+          const temp = this.board[target];
+          this.board[target] = this.board[this.blankIndex];
+          this.board[this.blankIndex] = temp;
+          this.blankIndex = target;
+        }
+
+        // Avoid trivial solved start
+        if (this.isSolved()) {
+          this.shuffleBoard(moves);
+        }
+      }
+
+      createTiles() {
+        for (let index = 0; index < this.board.length; index++) {
+          const value = this.board[index];
+          if (value === 0) continue; // no sprite for blank
+
+          const pos = this.indexToWorld(index);
+          const container = this.add.container(pos.x, pos.y);
+
+          const rect = this.add.rectangle(
+            0,
+            0,
+            this.tileSize - 6,
+            this.tileSize - 6,
+            0xffffff
+          );
+          rect.setStrokeStyle(2, 0x000000);
+
+          const text = this.add.text(
+            0,
+            0,
+            value.toString(),
+            {
+              fontFamily: 'Arial',
+              fontSize: '32px',
+              color: '#000000'
+            }
+          ).setOrigin(0.5);
+
+          container.add([rect, text]);
+          container.setSize(this.tileSize - 6, this.tileSize - 6);
+          container.setInteractive({ useHandCursor: true });
+          container.tileNumber = value;
+
+          container.on('pointerdown', () => this.onTileClicked(container));
+
+          this.tileSprites[value] = container;
+        }
+      }
+
+      indexToWorld(index) {
+        const row = Math.floor(index / this.gridSize);
+        const col = index % this.gridSize;
+        const x = this.offsetX + col * this.tileSize + this.tileSize / 2;
+        const y = this.offsetY + row * this.tileSize + this.tileSize / 2;
+        return { x, y };
+      }
+
+      getNeighborIndices(index) {
+        const neighbors = [];
+        const row = Math.floor(index / this.gridSize);
+        const col = index % this.gridSize;
+
+        if (row > 0) neighbors.push(index - this.gridSize);
+        if (row < this.gridSize - 1) neighbors.push(index + this.gridSize);
+        if (col > 0) neighbors.push(index - 1);
+        if (col < this.gridSize - 1) neighbors.push(index + 1);
+
+        return neighbors;
+      }
+
+      onTileClicked(tileContainer) {
+        if (this.isAnimating) return;
+
+        const tileNumber = tileContainer.tileNumber;
+        const tileIndex = this.board.indexOf(tileNumber);
+        const blankIndex = this.blankIndex;
+        const neighbors = this.getNeighborIndices(blankIndex);
+
+        // Only move if tile is adjacent to blank
+        if (!neighbors.includes(tileIndex)) {
+          return;
+        }
+
+        this.isAnimating = true;
+        const targetPos = this.indexToWorld(blankIndex);
+
+        this.tweens.add({
+          targets: tileContainer,
+          x: targetPos.x,
+          y: targetPos.y,
+          duration: 150,
+          onComplete: () => {
+            // Swap in board state
+            this.board[blankIndex] = tileNumber;
+            this.board[tileIndex] = 0;
+            this.blankIndex = tileIndex;
+
+            this.isAnimating = false;
+
+            if (this.isSolved()) {
+              this.showVictory();
+            }
+          }
+        });
+      }
+
+      isSolved() {
+        const totalTiles = this.gridSize * this.gridSize;
+        for (let i = 0; i < totalTiles - 1; i++) {
+          if (this.board[i] !== i + 1) {
+            return false;
+          }
+        }
+        return this.board[totalTiles - 1] === 0;
+      }
+
+      showVictory() {
+        this.victoryText.setText('Solved! 🎉');
+        this.input.enabled = false;
+      }
+    }
+
+    const config = {
+      type: Phaser.AUTO,
+      width: 480,
+      height: 520,
+      backgroundColor: '#222222',
+      parent: 'game-container',
+      scene: FifteenPuzzleScene
+    };
+
+    new Phaser.Game(config);
+  </script>
+</body>
+</html>
