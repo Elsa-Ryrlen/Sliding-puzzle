@@ -29,9 +29,9 @@
     const TILE_SIZE = 100;
     const GRID_SIZE = 3;
 
-    class FifteenPuzzleScene extends Phaser.Scene {
+    class SlidingPuzzleScene extends Phaser.Scene {
       constructor() {
-        super('FifteenPuzzleScene');
+        super('SlidingPuzzleScene');
       }
 
       create() {
@@ -229,7 +229,7 @@
       height: 520,
       backgroundColor: '#222222',
       parent: 'game-container',
-      scene: FifteenPuzzleScene
+      scene: SlidingPuzzleScene
     };
 
     new Phaser.Game(config);
