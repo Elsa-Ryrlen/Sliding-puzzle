@@ -34,6 +34,10 @@
         super('SlidingPuzzleScene');
       }
 
+      preload() {
+        this.load.audio("tile-hit", "assets/audio/tile-hit.wav");
+      }
+
       create() {
         const { width, height } = this.scale;
 
@@ -232,6 +236,8 @@
             this.blankIndex = tileIndex;
 
             this.isAnimating = false;
+
+            this.sound.play("tile-hit");
 
             if (this.isSolved()) {
               this.showVictory();
