@@ -54,12 +54,17 @@
         .on('pointerout', () => rect.setFillStyle(0xffffff))
         .on('pointerdown', onClick);
 
+       // store callback for keyboard selection
+      container.callback = onClick;
+      container.rect = rect; // store rect for highlighting
       return container;
     }
 
     class MenuScene extends Phaser.Scene {
       constructor() {
         super('MenuScene');
+        this.buttons = [];
+        this.currentIndex = 0;
       }
       create() {
         const { width, height } = this.scale;
@@ -71,21 +76,60 @@
           color: '#ffffff'
         }).setOrigin(0.5);
 
-        makeTextButton(this, width / 2, 240, 'Start', () => {
-          this.scene.start('SlidingPuzzleScene'); // <— change  
-        });
+          // Create buttons
+      this.buttons.push(makeTextButton(this, width / 2, 240, 'Start', () => {
+        this.scene.start('SlidingPuzzleScene');
+      }));
 
-        makeTextButton(this, width / 2, 300, 'Instructions', () => {
-          this.scene.start('InstructionsScene');
-        });
+      this.buttons.push(makeTextButton(this, width / 2, 300, 'Instructions', () => {
+        this.scene.start('InstructionsScene');
+      }));
 
-        this.add.text(width / 2, height - 24, '© You • Phaser 3', {
-          fontFamily: 'Arial',
-          fontSize: '12px',
-          color: '#bbbbbb'
-        }).setOrigin(0.5);
-      }
+      this.add.text(width / 2, height - 24, '© You • Phaser 3', {
+        fontFamily: 'Arial',
+        fontSize: '12px',
+        color: '#bbbbbb'
+      }).setOrigin(0.5);
+
+      // Keyboard input following your working pattern
+      this.input.keyboard.on('keydown-J', () => {
+        if (this.input.enabled === false) return;
+        this.cycleSelection();
+      });
+
+      this.input.keyboard.on('keydown-K', () => {
+        if (this.input.enabled === false) return;
+        this.activateButton();
+      });
+
+      // Highlight the first button
+      this.updateButtonHighlight();
     }
+
+  cycleSelection() {
+    this.currentIndex = (this.currentIndex + 1) % this.buttons.length;
+    this.updateButtonHighlight();
+  }
+
+  updateButtonHighlight() {
+  this.buttons.forEach((btn, index) => {
+    if (index === this.currentIndex) {
+      // Selected button: soft yellow with orange border
+      btn.rect.setFillStyle(0xffee99);   // background color
+      btn.rect.setStrokeStyle(3, 0xffaa00); // thicker orange border
+    } else {
+      btn.rect.setFillStyle(0xffffff);  
+      btn.rect.setStrokeStyle(2, 0x000000);
+    }
+  });
+}
+
+
+  activateButton() {
+    const btn = this.buttons[this.currentIndex];
+    if (btn.callback) btn.callback();
+  }
+}
 
     class InstructionsScene extends Phaser.Scene {
       constructor() {
