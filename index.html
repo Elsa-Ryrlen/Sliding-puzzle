@@ -131,7 +131,8 @@
       }
 
       preload() {
-        this.load.audio("tile-hit", "assets/audio/tile-hit.wav");
+        this.load.audio("tileHit", "assets/audio/tile-hit.wav");
+        this.load.image("puzzleImage", "assets/img/lorax.png");
       }
 
       create() {
@@ -244,9 +245,15 @@
             0,
             this.tileSize - 6,
             this.tileSize - 6,
-            0xffffff
+            0xFFFFFF,
+            0
           );
-          rect.setStrokeStyle(2, 0x000000);
+          rect.setStrokeStyle(2, 0x000000, 0.);
+          rect.isFilled = false;
+          rect.isStroked = false;
+
+          const sprite = this.add.image(0, 0, "puzzleImage");
+          sprite.setDisplaySize(this.tileSize - 6, this.tileSize - 6);
 
           const text = this.add.text(
             0,
@@ -259,7 +266,7 @@
             }
           ).setOrigin(0.5);
 
-          container.add([rect, text]);
+          container.add([sprite, rect, text]);
           container.setSize(this.tileSize - 6, this.tileSize - 6);
           container.setInteractive({ useHandCursor: true });
           container.tileNumber = value;
@@ -334,7 +341,7 @@
 
             this.isAnimating = false;
 
-            this.sound.play("tile-hit");
+            this.sound.play("tileHit");
 
             if (this.isSolved()) {
               this.showVictory();
@@ -429,8 +436,10 @@
           const c = this.tileSprites[key];
           if (c && c.bgRect) {
             c.bgRect.setFillStyle(0xffffff);
-            c.bgRect.setStrokeStyle(2, 0x000000);
-            c.setScale(1);
+            c.bgRect.setStrokeStyle(2, 0x000000, 0.);
+            c.bgRect.isFilled = false;
+            c.bgRect.isStroked = false;
+            c.bgRect.fillAlpha = 0.;
           }
         }
       }
@@ -445,7 +454,9 @@
         if (container && container.bgRect) {
           container.bgRect.setFillStyle(0xffee99);
           container.bgRect.setStrokeStyle(3, 0xffaa00);
-          container.setScale(1.02);
+          container.bgRect.isFilled = true;
+          container.bgRect.isStroked = true;
+          container.bgRect.fillAlpha = .3;
         }
       }
     }
